@@ -1,0 +1,1392 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CausalCine: Real-time Autoregressive Generation for Multi-Shot Video Narratives</title>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&amp;family=Space+Mono:wght@400;700&amp;display=swap" rel="stylesheet">
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #070a12;
+      --bg-soft: #0e1424;
+      --card: rgba(255, 255, 255, 0.075);
+      --card-strong: rgba(255, 255, 255, 0.12);
+      --text: #f5f7fb;
+      --muted: #aab4ca;
+      --line: rgba(255, 255, 255, 0.14);
+      --accent: #8dd8ff;
+      --accent-2: #bda7ff;
+      --accent-3: #7dffcb;
+      --shadow: 0 24px 80px rgba(0, 0, 0, 0.42);
+      --radius: 3px;
+      --mechanism-cycle: 3s;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+      background: #070a12;
+      min-height: 100vh;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    .page {
+      width: min(1180px, calc(100% - 36px));
+      margin: 0 auto;
+    }
+
+    .nav {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      padding: 0.7rem 0;
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      backdrop-filter: blur(18px);
+    }
+
+    .nav a {
+      color: var(--muted);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 8px 13px;
+      background: rgba(255, 255, 255, 0.045);
+      font-size: 13px;
+      font-weight: 650;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      transition: color 160ms ease, border-color 160ms ease, background 160ms ease;
+    }
+
+    .nav a:hover,
+    .nav a:focus-visible {
+      color: var(--text);
+      border-color: rgba(141, 216, 255, 0.45);
+      background: rgba(141, 216, 255, 0.1);
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 28px;
+      align-items: start;
+      padding: 64px 0 46px;
+    }
+
+    .hero > div:last-child {
+      width: 100%;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--accent-3);
+      border: 1px solid rgba(125, 255, 203, 0.25);
+      border-radius: 999px;
+      padding: 8px 12px;
+      background: rgba(125, 255, 203, 0.08);
+      font-size: 13px;
+      font-weight: 650;
+      letter-spacing: 0.02em;
+    }
+
+    h1 {
+      font-family: 'Press Start 2P', system-ui;
+      margin: 20px 0 18px;
+      font-size: 2.8rem;
+      line-height: 0.95;
+      letter-spacing: -0.065em;
+    }
+
+    .subtitle {
+      font-size: clamp(18px, 2.2vw, 24px);
+      color: #dce6f6;
+      line-height: 1.45;
+      margin: 0 0 22px;
+    }
+
+    .abstract {
+      color: var(--muted);
+      line-height: 1.72;
+      font-size: 15px;
+      max-width: 760px;
+    }
+
+    .authors-section {
+      margin: 20px 0 22px;
+      max-width: 920px;
+    }
+
+    .authors {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 14px;
+      color: #dce6f6;
+      font-size: 15px;
+      line-height: 1.55;
+    }
+
+    .author-block {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 3px;
+      white-space: nowrap;
+    }
+
+    .author-block a {
+      color: var(--text);
+      border-bottom: 1px solid rgba(141, 216, 255, 0.34);
+      transition: color 160ms ease, border-color 160ms ease;
+    }
+
+    .author-block a:hover,
+    .author-block a:focus-visible {
+      color: var(--accent);
+      border-color: rgba(141, 216, 255, 0.8);
+    }
+
+    .authors sup,
+    .author-affiliation sup {
+      color: var(--accent-3);
+      font-size: 0.7em;
+      line-height: 0;
+    }
+
+    .author-affiliation {
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .video-frame {
+      position: relative;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    video {
+      display: block;
+      width: 100%;
+      border-radius: var(--radius);
+      background: #000;
+    }
+
+    .caption-bar {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 0.4rem;
+      color: var(--muted);
+      font-size: 1rem;
+    }
+
+    section {
+      padding: 54px 0;
+    }
+
+    .section-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 18px;
+      align-items: end;
+      margin-bottom: 22px;
+    }
+
+    h2 {
+      font-family: 'Press Start 2P', system-ui;
+      margin: 0;
+      font-size: 1.8rem;
+      letter-spacing: -0.04em;
+    }
+
+    .section-copy {
+      color: var(--muted);
+      line-height: 1.65;
+      max-width: 760px;
+      margin: 10px 0 0;
+    }
+
+    .card {
+      border: 1px solid var(--line);
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: 0 12px 42px rgba(0, 0, 0, 0.18);
+    }
+
+    .mechanism {
+      padding-top: 24px;
+    }
+
+    .mechanism-panel {
+      position: relative;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      border-radius: var(--radius);
+      background:
+        linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+        rgba(255, 255, 255, 0.035);
+      background-size: 18px 18px;
+      padding: 22px;
+      box-shadow: 0 18px 60px rgba(0, 0, 0, 0.28);
+    }
+
+    .mechanism-panel::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: linear-gradient(90deg, transparent, rgba(125, 255, 203, 0.09), transparent);
+      animation: scanline 3s linear infinite;
+    }
+
+    .mechanism-stage {
+      position: relative;
+      z-index: 1;
+    }
+
+    .mechanism-arrows {
+      width: 100%;
+      height: 58px;
+      margin-bottom: 4px;
+      overflow: visible;
+    }
+
+    .mechanism-arrows .active-causal-path {
+      fill: none;
+      stroke: rgba(245, 247, 251, 0.78);
+      stroke-width: 1.4;
+      stroke-dasharray: 5 6;
+      opacity: 0;
+      animation:
+        causalAppear var(--mechanism-cycle) ease-in-out infinite,
+        causalDash var(--mechanism-cycle) linear infinite;
+    }
+
+    .mechanism-track {
+      position: relative;
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 14px;
+      align-items: start;
+    }
+
+    .shot-frame {
+      position: relative;
+      min-height: 138px;
+      border: 2px solid rgba(245, 247, 251, 0.88);
+      background: rgba(0, 0, 0, 0.35);
+      animation: shotAdvance var(--mechanism-cycle) ease-in-out infinite;
+    }
+
+    .shot-frame::before {
+      content: "";
+      position: absolute;
+      border: 1px solid rgba(245, 247, 251, 0.28);
+      inset: 12px 14px 42px;
+    }
+
+    .shot-frame:first-child {
+      animation-name: shotExit;
+    }
+
+    .shot-frame.relevant {
+      border-color: rgba(141, 216, 255, 0.95);
+      box-shadow: 0 0 0 1px rgba(141, 216, 255, 0.22), 0 0 20px rgba(141, 216, 255, 0.18);
+    }
+
+    .shot-frame.relevant::before {
+      border-color: rgba(141, 216, 255, 0.48);
+    }
+
+    .shot-frame.generating {
+      border-color: var(--accent-3);
+      box-shadow: 0 0 0 1px rgba(125, 255, 203, 0.22), 0 0 26px rgba(125, 255, 203, 0.2);
+    }
+
+    .shot-frame.generating::before {
+      inset: 12px;
+      border-color: rgba(125, 255, 203, 0.36);
+      background:
+        repeating-linear-gradient(
+          -45deg,
+          rgba(125, 255, 203, 0.08) 0,
+          rgba(125, 255, 203, 0.08) 8px,
+          transparent 8px,
+          transparent 16px
+        );
+      animation: generateFill 1.2s steps(4) infinite;
+    }
+
+    .shot-label,
+    .generating-label {
+      position: absolute;
+      left: 10px;
+      bottom: 9px;
+      z-index: 1;
+      color: rgba(245, 247, 251, 0.84);
+      font-family: 'Space Mono', monospace;
+      font-size: 12px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .generating-label {
+      color: var(--accent-3);
+      animation: blinkText 1.2s steps(2) infinite;
+    }
+
+    .prompt-box {
+      width: min(380px, 100%);
+      margin: 14px 0 0 auto;
+      border: 1px solid rgba(125, 255, 203, 0.34);
+      background: rgba(125, 255, 203, 0.07);
+      color: var(--accent-3);
+      padding: 12px 14px;
+      font-family: 'Space Mono', monospace;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .prompt-box strong {
+      color: var(--text);
+    }
+
+    .mechanism-notes {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .mechanism-note {
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      background: rgba(0, 0, 0, 0.24);
+      padding: 13px;
+      font-size: 13px;
+      line-height: 1.55;
+      color: var(--muted);
+    }
+
+    .mechanism-note strong {
+      display: block;
+      margin-bottom: 4px;
+      color: var(--text);
+      font-family: 'Space Mono', monospace;
+      font-size: 12px;
+      text-transform: uppercase;
+    }
+
+    .gallery {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+    }
+
+    .card {
+      overflow: hidden;
+    }
+
+    .card-media {
+      position: relative;
+      background: #000;
+    }
+
+    .card-media video {
+      border-radius: 0;
+    }
+
+    .card-body {
+      padding: 14px 16px 16px;
+    }
+
+    .card h3 {
+      margin: 0;
+      font-size: 18px;
+      line-height: 1.35;
+      letter-spacing: -0.02em;
+    }
+
+    .card p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.58;
+      font-size: 14px;
+    }
+
+    .comparison-list {
+      display: grid;
+      gap: 26px;
+    }
+
+    .comparison-case {
+      border: 1px solid var(--line);
+      border-radius: calc(var(--radius) + 4px);
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.045));
+      box-shadow: 0 16px 52px rgba(0, 0, 0, 0.22);
+      padding: 18px;
+    }
+
+    .comparison-case h3 {
+      margin: 0 0 16px;
+      font-size: 22px;
+      letter-spacing: -0.03em;
+    }
+
+    .comparison-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 3fr) minmax(0, 7fr);
+      gap: 18px;
+      align-items: center;
+    }
+
+    .comparison-primary,
+    .comparison-baseline {
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(0, 0, 0, 0.22);
+    }
+
+    .comparison-primary video,
+    .comparison-baseline video {
+      border-radius: 0;
+    }
+
+    .comparison-label {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 11px 13px 13px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .comparison-label strong {
+      color: var(--text);
+      font-size: 15px;
+    }
+
+    .comparison-label .tag {
+      border: 1px solid rgba(125, 255, 203, 0.28);
+      border-radius: 999px;
+      padding: 4px 8px;
+      color: var(--accent-3);
+      background: rgba(125, 255, 203, 0.08);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .baseline-grid {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .baseline-grid > .comparison-baseline {
+      grid-column: span 2;
+    }
+
+    .baseline-grid > .comparison-baseline:nth-last-child(1):nth-child(3n + 1) {
+      grid-column: 3 / span 2;
+    }
+
+    .baseline-grid > .comparison-baseline:nth-last-child(2):nth-child(3n + 1) {
+      grid-column: 2 / span 2;
+    }
+
+    @keyframes causalDash {
+      to {
+        stroke-dashoffset: -22;
+      }
+    }
+
+    @keyframes causalAppear {
+      0%,
+      16% {
+        opacity: 0;
+      }
+
+      26%,
+      76% {
+        opacity: 1;
+      }
+
+      100% {
+        opacity: 0;
+      }
+    }
+
+    @keyframes scanline {
+      from {
+        transform: translateX(-100%);
+      }
+
+      to {
+        transform: translateX(100%);
+      }
+    }
+
+    @keyframes shotAdvance {
+      0%,
+      56% {
+        transform: translateX(0);
+        opacity: 1;
+      }
+
+      100% {
+        transform: translateX(calc(-100% - 14px));
+        opacity: 0.96;
+      }
+    }
+
+    @keyframes shotExit {
+      0%,
+      56% {
+        transform: translateX(0);
+        opacity: 1;
+      }
+
+      100% {
+        transform: translateX(calc(-100% - 14px));
+        opacity: 0;
+      }
+    }
+
+    @keyframes shotAdvanceVertical {
+      0%,
+      56% {
+        transform: translateY(0);
+        opacity: 1;
+      }
+
+      100% {
+        transform: translateY(calc(-100% - 14px));
+        opacity: 0.96;
+      }
+    }
+
+    @keyframes shotExitVertical {
+      0%,
+      56% {
+        transform: translateY(0);
+        opacity: 1;
+      }
+
+      100% {
+        transform: translateY(calc(-100% - 14px));
+        opacity: 0;
+      }
+    }
+
+    @keyframes generateFill {
+      50% {
+        opacity: 0.42;
+      }
+    }
+
+    @keyframes blinkText {
+      50% {
+        opacity: 0.38;
+      }
+    }
+
+    @media (max-width: 920px) {
+      .hero,
+      .mechanism-notes,
+      .gallery,
+      .comparison-layout {
+        grid-template-columns: 1fr;
+      }
+
+      .mechanism-track {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .mechanism-arrows {
+        display: none;
+      }
+
+      .baseline-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+
+      .baseline-grid > .comparison-baseline:nth-last-child(1):nth-child(3n + 1),
+      .baseline-grid > .comparison-baseline:nth-last-child(2):nth-child(3n + 1) {
+        grid-column: span 2;
+      }
+
+      .baseline-grid > .comparison-baseline:nth-last-child(1):nth-child(odd) {
+        grid-column: 2 / span 2;
+      }
+
+      .hero {
+        padding-top: 28px;
+      }
+
+      .section-head {
+        display: block;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .page {
+        width: min(100% - 24px, 1180px);
+      }
+
+      .nav {
+        align-items: center;
+        position: static;
+        justify-content: flex-start;
+      }
+
+      h1 {
+        font-size: 42px;
+      }
+
+      .authors {
+        gap: 6px 10px;
+        font-size: 14px;
+      }
+
+      .baseline-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .baseline-grid > .comparison-baseline,
+      .baseline-grid > .comparison-baseline:nth-last-child(1):nth-child(3n + 1),
+      .baseline-grid > .comparison-baseline:nth-last-child(2):nth-child(3n + 1),
+      .baseline-grid > .comparison-baseline:nth-last-child(1):nth-child(odd) {
+        grid-column: auto;
+      }
+
+      .mechanism-panel {
+        padding: 14px;
+      }
+
+      .mechanism-track {
+        grid-template-columns: 1fr;
+      }
+
+      .mechanism-arrows {
+        display: block;
+        position: absolute;
+        inset: 0 0 auto;
+        z-index: 3;
+        height: 100%;
+        margin: 0;
+        pointer-events: none;
+      }
+
+      .shot-frame {
+        animation-name: shotAdvanceVertical;
+      }
+
+      .shot-frame:first-child {
+        animation-name: shotExitVertical;
+      }
+
+      .shot-frame {
+        min-height: 120px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header class="page hero">
+      <div>
+        <h1>CausalCine</h1>
+        <p class="subtitle">Real-time Autoregressive Generation for Multi-Shot Video Narratives</p>
+        <div class="authors-section">
+          <div class="authors">
+            <span class="author-block"><a href="https://yihao-meng.github.io/">Yihao Meng*</a><sup>1,2</sup></span>
+            <span class="author-block"><a href="https://zliucz.github.io/">Zichen Liu*</a><sup>1,2</sup></span>
+            <span class="author-block"><a href="https://ken-ouyang.github.io/">Hao Ouyang</a><sup>2</sup></span>
+            <span class="author-block"><a href="https://github.com/qiuyu96">Qiuyu Wang</a><sup>2</sup></span>
+            <span class="author-block"><a href="https://felixcheng97.github.io/">Ka Leong Cheng</a><sup>2</sup></span>
+            <span class="author-block"><a href="https://bruceyy.com/">Yue Yu</a><sup>1,2</sup></span>
+            <span class="author-block"><a aria-disabled="true">Haobo Li</a><sup>3,2</sup></span>
+            <span class="author-block"><a href="https://scholar.google.com/citations?user=-ACBm-gAAAAJ&hl=zh-TW">Jiapeng Zhu</a><sup>2</sup></span>
+            <span class="author-block"><a href="https://zengyh1900.github.io/">Yanhong Zeng</a><sup>2</sup></span>
+            <span class="author-block"><a href="https://scholar.google.com/citations?user=0uO4fzkAAAAJ&hl=zh-CN">Hanlin Wang</a><sup>1,2</sup></span>
+            <span class="author-block"><a href="https://scholar.google.com/citations?user=Hnh87z4AAAAJ&hl=en">Xing Zhu</a><sup>2</sup></span>
+            <span class="author-block"><a href="https://shenyujun.github.io/">Yujun Shen</a><sup>2</sup></span>
+            <span class="author-block"><a href="https://cqf.io/">Qifeng Chen</a><sup>1</sup></span>
+            <span class="author-block"><a href="http://huamin.org/">Huamin Qu</a><sup>1</sup></span>
+          </div>
+          <div class="author-affiliation">
+            <span class="affiliation-text"><sup>1</sup>HKUST, <sup>2</sup>Ant Group, <sup>3</sup>SJTU</span><br>
+            <span class="affiliation-text">* Equal contribution</span>
+          </div>
+        </div>
+        <nav class="page nav" aria-label="Primary">
+          <a href="#">📄 Paper</a>
+          <a href="#">💻 GitHub</a>
+          <a href="#">🤗 Model</a>
+        </nav>
+        <p class="abstract">
+          CausalCine turns long-form video generation into an online directing process: it generates causally across shot changes, accepts live user instructions, and reuses relevant context without regenerating previous shots.
+        </p>
+      </div>
+      <div>
+        <div class="video-frame" id="interactive">
+          <video src="videos/demo.mp4" autoplay muted loop controls playsinline preload="metadata"></video>
+        </div>
+        <div class="caption-bar">
+          <span>Interactive Demo</span>
+        </div>
+      </div>
+    </header>
+
+    <section class="page mechanism" id="mechanism">
+      <div class="mechanism-panel" aria-label="Animated CausalCine mechanism diagram">
+        <div class="mechanism-stage">
+          <svg class="mechanism-arrows" viewBox="0 0 1000 84" role="img" aria-label="Causal arrows from earlier shots to later shots">
+            <defs>
+              <marker id="arrowHead" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="rgba(245, 247, 251, 0.78)"></path>
+              </marker>
+            </defs>
+            <g id="mechanismArrowLayer"></g>
+          </svg>
+          <div class="mechanism-track">
+            <div class="shot-frame"><span class="shot-label">Shot t-3</span></div>
+            <div class="shot-frame"><span class="shot-label">Shot t-2</span></div>
+            <div class="shot-frame"><span class="shot-label">Shot t-1</span></div>
+            <div class="shot-frame"><span class="shot-label">Shot t</span></div>
+            <div class="shot-frame generating"><span class="generating-label">generating...</span></div>
+          </div>
+          <div class="prompt-box">
+            <strong>prompt:</strong> <span id="mechanismPrompt">neon alley, rain, close-up</span>
+          </div>
+        </div>
+        <div class="mechanism-notes">
+          <div class="mechanism-note">
+            <strong>Real-time directing</strong>
+            16 FPS streaming generation on 8 NVIDIA H200 GPUs.
+          </div>
+          <div class="mechanism-note">
+            <strong>Causal multi-shot</strong>
+            Stable rollouts across shot boundaries with new content.
+          </div>
+          <div class="mechanism-note">
+            <strong>Content-aware memory</strong>
+            Retrieve relevant earlier shots by semantic content.
+          </div>
+          <div class="mechanism-note">
+            <strong>Prompt anytime</strong>
+            Append new directions without recomputing past shots.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="page" id="gallery">
+      <div class="section-head">
+        <div>
+          <h2>Video Gallery</h2>
+        </div>
+      </div>
+      <div class="gallery" id="videoGallery"></div>
+    </section>
+
+    <section class="page" id="comparison">
+      <div class="section-head">
+        <div>
+          <h2>Comparison</h2>
+        </div>
+      </div>
+      <div class="comparison-list" id="comparisonList"></div>
+    </section>
+  </main>
+
+  <script>
+    const samples = [
+      {
+        group: "15s v1",
+        duration: "15s",
+        version: "v1",
+        title: "Suspenseful horror in an abandoned hospital ward",
+        src: "videos/2.mp4",
+        prompt: "A long dark hospital corridor, a rusted wheelchair, a teenager with a flashlight, and a pale hand emerging from the shadows.",
+        shots: 5
+      },
+      {
+        group: "15s v1",
+        duration: "15s",
+        version: "v1",
+        title: "Elderly painter in a sunlit coastal studio",
+        src: "videos/3.mp4",
+        prompt: "A quiet drama about an elderly painter mixing oils, facing a blank canvas, and beginning a deliberate first stroke.",
+        shots: 5
+      },
+      {
+        group: "15s v1",
+        duration: "15s",
+        version: "v1",
+        title: "Submarine thriller in crushing underwater darkness",
+        src: "videos/4.mp4",
+        prompt: "A black submarine, sonar blips, a tense captain, leaking pressure valves, and a torpedo launch near a deep trench.",
+        shots: 5
+      },
+      {
+        group: "15s v1",
+        duration: "15s",
+        version: "v1",
+        title: "Truth-blooming silver flowers in a winter glasshouse",
+        src: "videos/5.mp4",
+        prompt: "A botanist discovers a flower that blooms only when someone tells the truth inside a snowy botanical garden.",
+        shots: 5
+      },
+      {
+        group: "15s v1",
+        duration: "15s",
+        version: "v1",
+        title: "Mountain monk repairs a cracked bell before sunrise",
+        src: "videos/6.mp4",
+        prompt: "A monk repairs a bronze bell in a cliffside monastery as an avalanche approaches through the predawn snow.",
+        shots: 5
+      },
+      {
+        group: "15s v1",
+        duration: "15s",
+        version: "v1",
+        title: "Father and daughter repair an old sailboat",
+        src: "videos/7.mp4",
+        prompt: "A sunset marina story about repairing a sailboat, finding a family photo, and leaving harbor with an urn of ashes.",
+        shots: 5
+      },
+      {
+        group: "15s v1",
+        duration: "15s",
+        version: "v1",
+        title: "Robot caretaker reopens an abandoned amusement park",
+        src: "videos/8.mp4",
+        prompt: "A lonely robot keeps a deserted amusement park running for one final child visitor as the park lights come alive.",
+        shots: 5
+      },
+      {
+        group: "15s v1",
+        duration: "15s",
+        version: "v1",
+        title: "Lone survivor in a vegetation-covered ruined city",
+        src: "videos/9.mp4",
+        prompt: "A gas-masked survivor crosses overgrown ruins, searches a cabinet, and looks over the devastated city at dawn.",
+        shots: 5
+      },
+      {
+        group: "15s v1",
+        duration: "15s",
+        version: "v1",
+        title: "Vintage train through the Swiss Alps in autumn",
+        src: "videos/10.mp4",
+        prompt: "A contemplative traveler sketches mountains while a red vintage train passes golden forests and turquoise Alpine lakes.",
+        shots: 5
+      },
+      {
+        group: "15s v1",
+        duration: "15s",
+        version: "v1",
+        title: "Prison escape through a narrow underground tunnel",
+        src: "videos/11.mp4",
+        prompt: "Two prisoners lift a stone slab, crawl through a claustrophobic tunnel, and emerge outside the prison walls at night.",
+        shots: 5
+      },
+      {
+        group: "15s v2",
+        duration: "15s",
+        version: "v2",
+        title: "Watchmaker repairs an antique golden pocket watch",
+        src: "videos/12.mp4",
+        prompt: "An elderly watchmaker with a silver loupe repairs a pocket watch in a dusty sunlit workshop.",
+        shots: 5
+      },
+      {
+        group: "15s v2",
+        duration: "15s",
+        version: "v2",
+        title: "Detective examines a torn photograph in a rain-streaked office",
+        src: "videos/13.mp4",
+        prompt: "A weary detective turns on a green desk lamp and studies a torn photograph for a hidden watermark.",
+        shots: 5
+      },
+      {
+        group: "15s v2",
+        duration: "15s",
+        version: "v2",
+        title: "Blacksmith forges a glowing red sword blade",
+        src: "videos/14.mp4",
+        prompt: "A grizzled blacksmith pulls steel from a roaring forge and hammers it on a massive iron anvil.",
+        shots: 5
+      },
+      {
+        group: "15s v2",
+        duration: "15s",
+        version: "v2",
+        title: "Mechanic repairs a vintage motorcycle engine",
+        src: "videos/15.mp4",
+        prompt: "A focused mechanic loosens a rusted bolt, wipes sweat from her forehead, and lifts an engine cylinder head.",
+        shots: 5
+      },
+      {
+        group: "15s v2",
+        duration: "15s",
+        version: "v2",
+        title: "Jeweler sets a tiny diamond into a gold ring",
+        src: "videos/16.mp4",
+        prompt: "A jeweler uses tweezers and fine tools under a bright desk lamp to finish a glittering diamond ring.",
+        shots: 5
+      },
+      {
+        group: "15s v2",
+        duration: "15s",
+        version: "v2",
+        title: "Ballerina ties pointe shoes in a sunlit studio",
+        src: "videos/17.mp4",
+        prompt: "A graceful ballerina focuses on tying pointe shoes and preparing in a bright dance studio.",
+        shots: 5
+      },
+      {
+        group: "15s v2",
+        duration: "15s",
+        version: "v2",
+        title: "Gold miner sifts for nuggets in a mountain stream",
+        src: "videos/18.mp4",
+        prompt: "A rugged miner pans for gold in a sparkling stream with close-ups of hands, water, and concentration.",
+        shots: 5
+      },
+      {
+        group: "15s v2",
+        duration: "15s",
+        version: "v2",
+        title: "DJ scratches vinyl in a pulsing nightclub",
+        src: "videos/19.mp4",
+        prompt: "A focused DJ wearing oversized headphones scratches a record in a nightclub with pulsing light.",
+        shots: 5
+      },
+      {
+        group: "15s v2",
+        duration: "15s",
+        version: "v2",
+        title: "Hacker solders a microchip in a dark room",
+        src: "videos/20.mp4",
+        prompt: "A hacker concentrates on soldering a microchip onto a custom circuit board under dramatic lighting.",
+        shots: 5
+      },
+      {
+        group: "15s v2",
+        duration: "15s",
+        version: "v2",
+        title: "Botanist clips a rare orchid in a steamy jungle",
+        src: "videos/21.mp4",
+        prompt: "A botanist in a field jacket carefully clips a rare orchid among dense tropical plants.",
+        shots: 5
+      },
+      {
+        group: "30s v1",
+        duration: "30s",
+        version: "v1",
+        title: "Elven king mourns a dying magical forest",
+        src: "videos/22.mp4",
+        prompt: "A regal silver-haired elven king walks through ash-grey trees, surrounded by a dying forest and a falling golden leaf.",
+        shots: 4
+      },
+      {
+        group: "30s v1",
+        duration: "30s",
+        version: "v1",
+        title: "Spaceship medical bay with silent bad news",
+        src: "videos/23.mp4",
+        prompt: "A scarred commander and a concerned medical officer silently communicate a grim reality in a sterile spaceship bay.",
+        shots: 6
+      },
+      {
+        group: "30s v1",
+        duration: "30s",
+        version: "v1",
+        title: "Weary knight on a ruined battlefield at dusk",
+        src: "videos/24.mp4",
+        prompt: "A knight in dented armor drops a broken sword into the mud and looks up at the peaceful evening sky.",
+        shots: 5
+      },
+      {
+        group: "30s v1",
+        duration: "30s",
+        version: "v1",
+        title: "Explorer meets an alien being in a glowing jungle",
+        src: "videos/25.mp4",
+        prompt: "A human explorer pushes through giant glowing flora and encounters a serene iridescent alien in a clearing.",
+        shots: 6
+      },
+      {
+        group: "30s v1",
+        duration: "30s",
+        version: "v1",
+        title: "Teenager explores a spooky moonlit attic",
+        src: "videos/26.mp4",
+        prompt: "A curious teenager with a flickering candle freezes as shadows move in a dusty attic.",
+        shots: 5
+      },
+      {
+        group: "30s v1",
+        duration: "30s",
+        version: "v1",
+        title: "1940s train station farewell",
+        src: "videos/27.mp4",
+        prompt: "A soldier and lover exchange a tearful farewell among steam and vintage station lights.",
+        shots: 7
+      },
+      {
+        group: "30s v1",
+        duration: "30s",
+        version: "v1",
+        title: "Dragon tamer asserts dominance on a cliffside",
+        src: "videos/28.mp4",
+        prompt: "A tattooed dragon tamer stands fearless in high wind as a massive unseen beast casts its shadow over her.",
+        shots: 7
+      },
+      {
+        group: "30s v1",
+        duration: "30s",
+        version: "v1",
+        title: "Young soldier in snowy World War I trenches",
+        src: "videos/29.mp4",
+        prompt: "A homesick soldier studies a crumpled photograph while isolated in a freezing trench under moonlight.",
+        shots: 5
+      },
+      {
+        group: "30s v1",
+        duration: "30s",
+        version: "v1",
+        title: "Courtroom verdict through silent expressions",
+        src: "videos/30.mp4",
+        prompt: "A wrongfully accused defendant and a stern judge exchange subtle expressions as the verdict lands.",
+        shots: 10
+      },
+      {
+        group: "30s v1",
+        duration: "30s",
+        version: "v1",
+        title: "Sniper waits in a neon-lit city apartment",
+        src: "videos/31.mp4",
+        prompt: "A professional sniper waits with extreme patience in a dark apartment above neon-lit streets.",
+        shots: 4
+      },
+      {
+        group: "30s v1",
+        duration: "30s",
+        version: "v1",
+        title: "Detective finds an occult symbol in Victorian London",
+        src: "videos/32.mp4",
+        prompt: "A deerstalker detective discovers a glowing green occult symbol on wet bricks in a foggy midnight alley.",
+        shots: 6
+      },
+      {
+        group: "30s v1",
+        duration: "30s",
+        version: "v1",
+        title: "Traveler watches broken gravity in an apocalyptic wasteland",
+        src: "videos/33.mp4",
+        prompt: "A cloaked traveler watches giant boulders drift upward under a dull red sun at the end of the world.",
+        shots: 4
+      },
+      {
+        group: "30s v2",
+        duration: "30s",
+        version: "v2",
+        title: "Detective discovers a hidden message in a torn photograph",
+        src: "videos/34.mp4",
+        prompt: "A tan-coated detective works in golden-hour office light, inspecting a photograph with a magnifying glass.",
+        shots: 5
+      },
+      {
+        group: "30s v2",
+        duration: "30s",
+        version: "v2",
+        title: "Watchmaker restores a ticking antique pocket watch",
+        src: "videos/35.mp4",
+        prompt: "A dedicated watchmaker repairs brass gears in a dusty sunlit workshop and gets a pocket watch ticking again.",
+        shots: 5
+      },
+      {
+        group: "30s v2",
+        duration: "30s",
+        version: "v2",
+        title: "Botanist extracts a glowing droplet from a rare orchid",
+        src: "videos/36.mp4",
+        prompt: "A botanist studies a bioluminescent orchid in a steamy greenhouse at dawn, then extracts a glowing droplet.",
+        shots: 6
+      },
+      {
+        group: "30s v2",
+        duration: "30s",
+        version: "v2",
+        title: "Jeweler secures a brilliant diamond in a gold ring",
+        src: "videos/37.mp4",
+        prompt: "A meticulous jeweler uses tweezers and harsh workbench lighting to set a diamond into a gold ring.",
+        shots: 7
+      }
+    ];
+
+    const gallery = document.querySelector("#videoGallery");
+    const mixedOrder = [
+      21, 1, 33, 11, 25, 2, 34, 14, 28, 3, 35, 17,
+      31, 4, 36, 20, 22, 5, 12, 26, 6, 29, 15, 7,
+      32, 18, 8, 23, 13, 9, 30, 16, 10, 24, 19, 27
+    ];
+
+    function createCard(sample) {
+      const card = document.createElement("article");
+      card.className = "card";
+      card.innerHTML = `
+        <div class="card-media">
+          <video src="${sample.src}" autoplay muted loop controls playsinline preload="metadata"></video>
+        </div>
+        <div class="card-body">
+          <h3>Sample ${sample.displayNumber}</h3>
+        </div>
+      `;
+      return card;
+    }
+
+    const comparisonCases = [
+      {
+        title: "Case 1",
+        ours: "comparison_compressed/case1/ours.mp4",
+        baselines: [
+          { name: "Infinity Rope", src: "comparison_compressed/case1/inifinity_rope.mp4" },
+          { name: "LongLive", src: "comparison_compressed/case1/longlive.mp4" },
+          { name: "MemFlow", src: "comparison_compressed/case1/memflow.mp4" },
+          { name: "Self Forcing", src: "comparison_compressed/case1/sf.mp4" },
+          { name: "ShotStream", src: "comparison_compressed/case1/shotstream.mp4" }
+        ]
+      },
+      {
+        title: "Case 2",
+        ours: "comparison_compressed/case2/ours.mp4",
+        baselines: [
+          { name: "Infinity Rope", src: "comparison_compressed/case2/inifinity_rope.mp4" },
+          { name: "LongLive", src: "comparison_compressed/case2/longlive.mp4" },
+          { name: "MemFlow", src: "comparison_compressed/case2/memflow.mp4" },
+          { name: "Self Forcing", src: "comparison_compressed/case2/sf.mp4" },
+          { name: "ShotStream", src: "comparison_compressed/case2/shotstream.mp4" }
+        ]
+      },
+      {
+        title: "Case 3",
+        ours: "comparison_compressed/case3/ours.mp4",
+        baselines: [
+          { name: "Infinity Rope", src: "comparison_compressed/case3/infinity_rope.mp4" },
+          { name: "LongLive", src: "comparison_compressed/case3/longlive.mp4" },
+          { name: "MemFlow", src: "comparison_compressed/case3/memflow.mp4" },
+          { name: "Self Forcing", src: "comparison_compressed/case3/sf.mp4" },
+          { name: "ShotStream", src: "comparison_compressed/case3/shotstream.mp4" }
+        ]
+      },
+      {
+        title: "Case 4",
+        ours: "comparison_compressed/case4/ours.mp4",
+        baselines: [
+          { name: "Infinity Rope", src: "comparison_compressed/case4/infinity_rope.mp4" },
+          { name: "LongLive", src: "comparison_compressed/case4/longlive.mp4" },
+          { name: "MemFlow", src: "comparison_compressed/case4/memflow.mp4" },
+          { name: "Self Forcing", src: "comparison_compressed/case4/sf.mp4" },
+          { name: "ShotStream", src: "comparison_compressed/case4/shotstream.mp4" }
+        ]
+      }
+    ];
+
+    const comparisonList = document.querySelector("#comparisonList");
+
+    function createComparisonVideo(item, className, tag = "") {
+      const card = document.createElement("article");
+      card.className = className;
+      card.innerHTML = `
+        <video src="${item.src}" autoplay muted loop controls playsinline preload="metadata"></video>
+        <div class="comparison-label">
+          <strong>${item.name}</strong>
+          ${tag ? `<span class="tag">${tag}</span>` : ""}
+        </div>
+      `;
+      return card;
+    }
+
+    function createComparisonCase(comparisonCase) {
+      const caseEl = document.createElement("article");
+      caseEl.className = "comparison-case";
+
+      const baselineGrid = document.createElement("div");
+      baselineGrid.className = "baseline-grid";
+      comparisonCase.baselines.forEach((baseline) => {
+        baselineGrid.appendChild(createComparisonVideo(baseline, "comparison-baseline"));
+      });
+
+      const layout = document.createElement("div");
+      layout.className = "comparison-layout";
+      layout.appendChild(createComparisonVideo({ name: "Ours", src: comparisonCase.ours }, "comparison-primary", "CausalCine"));
+      layout.appendChild(baselineGrid);
+
+      const title = document.createElement("h3");
+      title.textContent = comparisonCase.title;
+      caseEl.appendChild(title);
+      caseEl.appendChild(layout);
+      return caseEl;
+    }
+
+    const mechanismPrompts = [
+      "moonlit attic, candle, moving shadow",
+      "neon alley, rain, close-up",
+      "desert convoy, dust, wide shot",
+      "glasshouse orchid, snow, whisper",
+      "submarine alarm, red light, leak",
+      "forest throne, ash, falling leaf",
+      "train platform, steam, farewell",
+      "robot carnival, lights, last child"
+    ];
+
+    const mechanismCycleMs = 3000;
+    let mechanismPromptIndex = -1;
+
+    function pickRelevantShots() {
+      const sourceIndexes = [0, 1, 2, 3];
+      const count = Math.random() > 0.5 ? 2 : 1;
+
+      for (let index = sourceIndexes.length - 1; index > 0; index -= 1) {
+        const swapIndex = Math.floor(Math.random() * (index + 1));
+        [sourceIndexes[index], sourceIndexes[swapIndex]] = [sourceIndexes[swapIndex], sourceIndexes[index]];
+      }
+
+      return sourceIndexes.slice(0, count).sort((a, b) => a - b);
+    }
+
+    function renderMechanismArrows(relevantShots) {
+      const arrowLayer = document.querySelector("#mechanismArrowLayer");
+      const arrowSvg = document.querySelector(".mechanism-arrows");
+      const mechanismTrack = document.querySelector(".mechanism-track");
+      const shotFrames = document.querySelectorAll(".mechanism-track .shot-frame");
+      if (!arrowLayer || !arrowSvg || !mechanismTrack || !shotFrames.length) return;
+
+      const isPhoneLayout = window.matchMedia("(max-width: 640px)").matches;
+      if (isPhoneLayout) {
+        arrowSvg.style.height = `${mechanismTrack.offsetHeight}px`;
+      } else {
+        arrowSvg.style.height = "";
+      }
+
+      const svgMatrix = arrowSvg.getScreenCTM()?.inverse();
+      if (!svgMatrix) return;
+
+      const trackRect = mechanismTrack.getBoundingClientRect();
+      const toSvgPoint = (clientX, clientY) => {
+        const point = new DOMPoint(clientX, clientY);
+        return point.matrixTransform(svgMatrix);
+      };
+      const frameCenters = Array.from(shotFrames).map((frame) => {
+        const centerX = trackRect.left + frame.offsetLeft + frame.offsetWidth / 2;
+        const centerY = isPhoneLayout
+          ? trackRect.top + frame.offsetTop + frame.offsetHeight / 2
+          : trackRect.top;
+        return toSvgPoint(centerX, centerY);
+      });
+      const targetPoint = frameCenters[4];
+      arrowLayer.innerHTML = "";
+
+      shotFrames.forEach((frame, index) => {
+        frame.classList.toggle("relevant", relevantShots.includes(index));
+      });
+
+      relevantShots.forEach((shotIndex) => {
+        const startPoint = frameCenters[shotIndex];
+        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        path.classList.add("active-causal-path");
+        if (isPhoneLayout) {
+          const distance = targetPoint.y - startPoint.y;
+          path.setAttribute("d", `M ${startPoint.x} ${startPoint.y} C ${startPoint.x - 38} ${startPoint.y + distance * 0.32}, ${targetPoint.x - 38} ${targetPoint.y - distance * 0.32}, ${targetPoint.x} ${targetPoint.y}`);
+        } else {
+          const distance = targetPoint.x - startPoint.x;
+          const lift = Math.min(50, 22 + distance * 0.05);
+          path.setAttribute("d", `M ${startPoint.x} 62 C ${startPoint.x + distance * 0.28} ${62 - lift}, ${targetPoint.x - distance * 0.28} ${62 - lift}, ${targetPoint.x} 62`);
+        }
+        path.setAttribute("marker-end", "url(#arrowHead)");
+        arrowLayer.appendChild(path);
+      });
+    }
+
+    function updateMechanismPrompt() {
+      const promptEl = document.querySelector("#mechanismPrompt");
+      if (!promptEl) return;
+
+      let nextIndex = Math.floor(Math.random() * mechanismPrompts.length);
+      if (nextIndex === mechanismPromptIndex) {
+        nextIndex = (nextIndex + 1) % mechanismPrompts.length;
+      }
+      mechanismPromptIndex = nextIndex;
+      promptEl.textContent = mechanismPrompts[nextIndex];
+    }
+
+    function updateMechanismCycle() {
+      renderMechanismArrows(pickRelevantShots());
+      updateMechanismPrompt();
+    }
+
+    function initMechanismAnimation() {
+      if (!document.querySelector("#mechanismArrowLayer")) return;
+
+      updateMechanismCycle();
+      setInterval(updateMechanismCycle, mechanismCycleMs);
+    }
+
+    function applyVideoDefaults() {
+      document.querySelectorAll("video").forEach((video) => {
+        video.autoplay = true;
+        video.muted = true;
+        video.defaultMuted = true;
+        video.playsInline = true;
+      });
+    }
+
+    function render() {
+      gallery.innerHTML = "";
+      mixedOrder
+        .map((number) => samples[number - 1])
+        .filter(Boolean)
+        .forEach((sample, index) => {
+          sample.displayNumber = index + 1;
+          gallery.appendChild(createCard(sample));
+        });
+
+      comparisonList.innerHTML = "";
+      comparisonCases.forEach((comparisonCase) => {
+        comparisonList.appendChild(createComparisonCase(comparisonCase));
+      });
+
+      applyVideoDefaults();
+    }
+
+    render();
+    initMechanismAnimation();
+  </script>
+</body>
+</html>
