@@ -94,6 +94,13 @@
       width: 100%;
     }
 
+    .hero > div:first-child {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+
     .eyebrow {
       display: inline-flex;
       align-items: center;
@@ -110,7 +117,7 @@
 
     h1 {
       font-family: 'Press Start 2P', system-ui;
-      margin: 20px 0 18px;
+      margin: 0 0 18px;
       font-size: 2.8rem;
       line-height: 0.95;
       letter-spacing: -0.065em;
@@ -120,25 +127,28 @@
       font-size: clamp(18px, 2.2vw, 24px);
       color: #dce6f6;
       line-height: 1.45;
-      margin: 0 0 22px;
+      max-width: 860px;
+      margin: 0 auto 22px;
     }
 
     .abstract {
       color: var(--muted);
       line-height: 1.72;
       font-size: 15px;
-      max-width: 760px;
+      max-width: 960px;
+      margin: 0 auto;
     }
 
     .authors-section {
-      margin: 20px 0 22px;
-      max-width: 920px;
+      margin: 20px auto 22px;
+      max-width: 980px;
     }
 
     .authors {
       display: flex;
       flex-wrap: wrap;
       gap: 8px 14px;
+      justify-content: center;
       color: #dce6f6;
       font-size: 15px;
       line-height: 1.55;
@@ -175,6 +185,13 @@
       color: var(--muted);
       font-size: 13px;
       line-height: 1.5;
+    }
+
+    .hero .nav {
+      width: auto;
+      position: static;
+      margin: 0 0 12px;
+      padding: 0.45rem 0;
     }
 
     .video-frame {
@@ -745,7 +762,7 @@
           <a href="#">📄 Research Paper</a>
         </nav>
         <p class="abstract">
-          CausalCine enables real-time interactive autoregressive multi-shot video generation: it streams video causally, follows new shot-level prompts during rollout, and reuses content-aware KV memory to preserve long-range story context without recomputing previous shots.
+          CausalCine enables real-time interactive autoregressive multi-shot video generation. It streams video causally, follows new shot-level prompts, and reuses content-aware KV memory to preserve long-range story context and cross-shot consistency.
         </p>
       </div>
       <div>
